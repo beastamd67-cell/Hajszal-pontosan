@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Calendar, X, Loader2, ClipboardList, CalendarOff, Plus, Trash2, Lock, LogOut } from "lucide-react";
+import { Calendar, X, Loader2, ClipboardList, CalendarOff, Plus, Trash2, Lock, LogOut, Link as LinkIcon, Copy, CheckCheck } from "lucide-react";
 import { COLORS, SERVICE, HU_DAYS } from "../../lib/theme";
 import { dateKey, formatHuDate, minutesToLabel, buildICS, downloadICS } from "../../lib/utils";
 import BarberStripe from "./BarberStripe";
@@ -191,6 +191,8 @@ function AdminDashboard() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 20px 80px" }}>
+      <CalendarFeedCard />
+
       <div style={{ background: COLORS.bgCard, border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: "18px 20px", marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'Oswald', sans-serif", fontWeight: 700, fontSize: 17, textTransform: "uppercase" }}>
           <CalendarOff size={17} /> Szabadság / zárás jelzése
@@ -288,6 +290,85 @@ function AdminDashboard() {
           );
         })
       )}
+    </div>
+  );
+}
+
+function CalendarFeedCard() {
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  async function loadLink() {
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/calendar-feed-link");
+      const data = await res.json();
+      if (!res.ok) throw new Error();
+      setUrl(data.url);
+    } catch {
+      setError("Nem sikerült lekérni a linket.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard nem elerheto, a mezobol kezzel is kimasolhato */ }
+  }
+
+  return (
+    <div style={{ background: COLORS.bgCard, border: `1px solid ${COLORS.line}`, borderRadius: 14, padding: "18px 20px", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'Oswald', sans-serif", fontWeight: 700, fontSize: 17, textTransform: "uppercase" }}>
+        <LinkIcon size={16} /> Automatikus naptár szinkron
+      </div>
+      <p style={{ fontSize: 13, color: COLORS.inkSoft, marginTop: 4 }}>
+        Ezzel a linkkel a telefonod (vagy bárki más, pl. a fodrász) Naptár appja automatikusan,
+        magától frissül minden új foglalással — nem kell egyesével letölteni semmit.
+      </p>
+
+      {!url ? (
+        <button onClick={loadLink} disabled={loading} style={{
+          marginTop: 12, padding: "10px 16px", borderRadius: 8, border: "none", background: COLORS.dark, color: "#fff",
+          fontWeight: 700, fontSize: 12.5, textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6,
+          opacity: loading ? 0.6 : 1,
+        }}>
+          {loading ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <LinkIcon size={14} />}
+          Link lekérése
+        </button>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <input readOnly value={url} onFocus={(e) => e.target.select()} style={{
+              flex: 1, padding: "9px 10px", borderRadius: 8, border: `1.5px solid ${COLORS.line}`, background: "#fff",
+              fontSize: 12, fontFamily: "'Space Mono', monospace",
+            }} />
+            <button onClick={copyLink} style={{
+              padding: "9px 14px", borderRadius: 8, border: "none", background: COLORS.dark, color: "#fff",
+              fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6,
+            }}>
+              {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
+              {copied ? "Kimásolva" : "Másolás"}
+            </button>
+          </div>
+          <div style={{ fontSize: 12.5, color: COLORS.inkSoft, marginTop: 12, lineHeight: 1.5 }}>
+            <strong>iPhone:</strong> Beállítások → Naptár → Fiókok → Fiók hozzáadása → Egyéb →
+            Előfizetett naptár hozzáadása → illeszd be a linket.<br />
+            <strong>Android / Google Naptár:</strong> számítógépen nyisd meg a calendar.google.com
+            oldalt → Egyéb naptárak melletti + → Feliratkozás URL-ről → illeszd be a linket. Ezután
+            a telefonos Google Naptár appban is automatikusan megjelenik.
+          </div>
+          <p style={{ fontSize: 12, color: COLORS.inkSoft, marginTop: 8 }}>
+            Ez a link bizalmas (ügyfélneveket és telefonszámokat tartalmaz) — csak azzal oszd meg, akinek látnia kell.
+          </p>
+        </>
+      )}
+      {error && <div style={{ color: COLORS.dark, fontSize: 13, marginTop: 8 }}>{error}</div>}
     </div>
   );
 }
