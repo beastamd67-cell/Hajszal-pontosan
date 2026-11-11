@@ -271,7 +271,7 @@ function AdminDashboard() {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 14 }}>{b.name}</div>
                         <div style={{ fontSize: 12.5, color: COLORS.inkSoft }}>
-                          {b.phone} · {b.duration} perc · {b.paid ? "kifizetve online" : "fizet helyben"}
+                          {b.phone} · {b.duration} perc · {b.paid ? "kifizetve online" : (b.amount || "").includes("utalás") ? "utalással fizet" : "fizet helyben"}
                         </div>
                       </div>
                     </div>

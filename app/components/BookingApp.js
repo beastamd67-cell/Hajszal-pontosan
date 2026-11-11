@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Scissors, Calendar, Clock, User, Phone, Check, X, Loader2, ClipboardList, CreditCard, Lock, CalendarOff } from "lucide-react";
-import { COLORS, SERVICE, HU_DAYS, HU_MONTHS } from "../../lib/theme";
+import { Scissors, Calendar, Clock, User, Phone, Check, X, Loader2, ClipboardList, Copy, CalendarOff } from "lucide-react";
+import { COLORS, SERVICE, BANK, TRANSFER_TAG, HU_DAYS, HU_MONTHS } from "../../lib/theme";
 import {
   dateKey, formatHuDate, nextOpenDays, minutesToLabel, buildICS, downloadICS,
   googleCalendarLink, findClosure, sanitizePhoneInput, isPhoneValid, slotsForDay,
@@ -15,7 +15,6 @@ export default function BookingApp() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("+36 ");
   const [payNow, setPayNow] = useState(true);
-  const [card, setCard] = useState({ number: "", expiry: "", cvc: "" });
   const [dayBookings, setDayBookings] = useState([]);
   const [closures, setClosures] = useState([]);
   const [loadingDay, setLoadingDay] = useState(false);
@@ -53,13 +52,8 @@ export default function BookingApp() {
     day: selectedDay, dayBookings, isToday: dateKey(selectedDay) === dateKey(new Date()), closed: !!selectedDayClosure,
   }), [dayBookings, selectedDay, selectedDayClosure]);
 
-  function cardValid() {
-    return card.number.replace(/\s/g, "").length >= 12 && card.expiry.length >= 4 && card.cvc.length >= 3;
-  }
-
   async function handleConfirm() {
     if (selectedSlot === null || !name.trim() || !isPhoneValid(phone)) return;
-    if (payNow && !cardValid()) { setError("Add meg a kártyaadatokat a fizetéshez, vagy válts fizetés helyben opcióra."); return; }
     setSaving(true); setError("");
     try {
       const res = await fetch("/api/bookings", {
@@ -71,8 +65,8 @@ export default function BookingApp() {
           duration: SERVICE.duration,
           name: name.trim(),
           phone: phone.trim(),
-          paid: payNow,
-          amount: SERVICE.priceLabel,
+          paid: false,
+          amount: payNow ? `${SERVICE.priceLabel} (${TRANSFER_TAG})` : SERVICE.priceLabel,
         }),
       });
       const data = await res.json();
@@ -100,7 +94,7 @@ export default function BookingApp() {
 
   function resetBookingFlow() {
     setConfirmed(null); setSelectedSlot(null); setName(""); setPhone("+36 ");
-    setCard({ number: "", expiry: "", cvc: "" }); setStep(1);
+    setStep(1);
   }
 
   const eventStartDate = confirmed
@@ -160,7 +154,7 @@ export default function BookingApp() {
           selectedSlot={selectedSlot} setSelectedSlot={setSelectedSlot}
           availableSlots={availableSlots} loadingDay={loadingDay} selectedDayClosure={selectedDayClosure}
           name={name} setName={setName} phone={phone} setPhone={setPhone}
-          payNow={payNow} setPayNow={setPayNow} card={card} setCard={setCard}
+          payNow={payNow} setPayNow={setPayNow}
           step={step} setStep={setStep}
           onConfirm={handleConfirm} saving={saving} error={error}
         />
@@ -174,7 +168,7 @@ function BookingFlow(props) {
     days, closures, selectedDay, setSelectedDay, selectedSlot, setSelectedSlot,
     availableSlots, loadingDay, selectedDayClosure,
     name, setName, phone, setPhone,
-    payNow, setPayNow, card, setCard, step, setStep,
+    payNow, setPayNow, step, setStep,
     onConfirm, saving, error,
   } = props;
 
@@ -190,7 +184,7 @@ function BookingFlow(props) {
         <div>
           <div style={{ fontFamily: "'Oswald', sans-serif", fontWeight: 700, fontSize: 19, textTransform: "uppercase", letterSpacing: "0.01em" }}>{SERVICE.name}</div>
           <div style={{ fontSize: 13, color: COLORS.inkSoft, fontFamily: "'Space Mono', monospace", marginTop: 3 }}>
-            {SERVICE.duration} perc · óránként, 18:00-ig
+            {SERVICE.duration} perc · óránként
           </div>
         </div>
         <div style={{ fontFamily: "'Space Mono', monospace", fontWeight: 700, fontSize: 18 }}>{SERVICE.priceLabel}</div>
@@ -277,7 +271,7 @@ function BookingFlow(props) {
               flex: 1, padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em",
               border: `1.5px solid ${payNow ? COLORS.dark : COLORS.line}`,
               background: payNow ? COLORS.dark : COLORS.bgCard, color: payNow ? "#fff" : COLORS.ink,
-            }}>Online fizetés most</button>
+            }}>Utalással fizetek</button>
             <button onClick={() => setPayNow(false)} style={{
               flex: 1, padding: "12px", borderRadius: 10, fontSize: 13, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.02em",
               border: `1.5px solid ${!payNow ? COLORS.dark : COLORS.line}`,
@@ -286,17 +280,10 @@ function BookingFlow(props) {
           </div>
 
           {payNow && (
-            <div style={{ marginTop: 16, background: COLORS.bgCard, border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 16, maxWidth: 420 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: COLORS.inkSoft, marginBottom: 12 }}>
-                <Lock size={12} /> Teszt mód — nem történik valódi terhelés, amíg nincs bekötve fizetési szolgáltató
-              </div>
-              <LabeledInput icon={<CreditCard size={15} />} placeholder="Kártyaszám" value={card.number}
-                onChange={(v) => setCard({ ...card, number: v })} />
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <LabeledInput placeholder="HH/ÉÉ" value={card.expiry} onChange={(v) => setCard({ ...card, expiry: v })} />
-                <LabeledInput placeholder="CVC" value={card.cvc} onChange={(v) => setCard({ ...card, cvc: v })} />
-              </div>
-            </div>
+            <BankBox
+              amountLabel={SERVICE.priceLabel}
+              reference={makeReference(name, selectedDay, selectedSlot)}
+            />
           )}
 
           {!payNow && (
@@ -321,7 +308,7 @@ function BookingFlow(props) {
               display: "flex", alignItems: "center", gap: 8, opacity: saving ? 0.7 : 1,
             }}>
               {saving ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={16} />}
-              {payNow ? "Fizetés és foglalás" : "Foglalás megerősítése"}
+              Foglalás megerősítése
             </button>
           </div>
         </div>
@@ -373,6 +360,72 @@ function StepLabel({ n, label }) {
   );
 }
 
+function makeReference(name, day, startMinutes) {
+  const mm = String(day.getMonth() + 1).padStart(2, "0");
+  const dd = String(day.getDate()).padStart(2, "0");
+  const time = startMinutes != null ? ` ${minutesToLabel(startMinutes)}` : "";
+  return `${(name || "").trim()} ${mm}.${dd}.${time}`.trim();
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch { return false; }
+  }
+}
+
+function BankBox({ amountLabel, reference }) {
+  const [copiedKey, setCopiedKey] = useState("");
+  const rows = [
+    { key: "holder", label: "Számlatulajdonos", value: BANK.holder },
+    { key: "bank", label: "Bank", value: BANK.bank, noCopy: true },
+    { key: "account", label: "Számlaszám", value: BANK.account },
+    { key: "amount", label: "Összeg", value: amountLabel, copyValue: String(amountLabel).replace(/[^0-9]/g, "") },
+    { key: "ref", label: "Közlemény", value: reference },
+  ];
+  async function handleCopy(row) {
+    const ok = await copyText(row.copyValue || row.value);
+    if (ok) { setCopiedKey(row.key); setTimeout(() => setCopiedKey(""), 1500); }
+  }
+  return (
+    <div style={{ marginTop: 16, background: COLORS.bgCard, border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: 16, maxWidth: 420 }}>
+      <div style={{ fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 }}>
+        Utald el az összeget az alábbi számlára, és a közleménybe írd be az alábbi szöveget, hogy azonosítani tudjam.
+      </div>
+      {rows.map((r) => (
+        <div key={r.key} style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          padding: "9px 0", borderTop: `1px dashed ${COLORS.line}`,
+        }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11.5, color: COLORS.inkSoft, textTransform: "uppercase", letterSpacing: "0.03em" }}>{r.label}</div>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontWeight: 700, fontSize: 14, wordBreak: "break-word" }}>{r.value}</div>
+          </div>
+          {!r.noCopy && (
+            <button type="button" onClick={() => handleCopy(r)} style={{
+              flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "7px 10px", borderRadius: 8,
+              border: `1.5px solid ${COLORS.line}`, background: copiedKey === r.key ? COLORS.dark : "#fff",
+              color: copiedKey === r.key ? "#fff" : COLORS.ink, fontSize: 12, fontWeight: 700,
+            }}>
+              {copiedKey === r.key ? <Check size={13} /> : <Copy size={13} />}
+              {copiedKey === r.key ? "Másolva" : "Másolás"}
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LabeledInput({ icon, placeholder, value, onChange }) {
   return (
     <div style={{
@@ -388,7 +441,8 @@ function LabeledInput({ icon, placeholder, value, onChange }) {
 }
 
 function ConfirmationTicket({ confirmed, day, eventStartDate, onNewBooking }) {
-  const description = `Foglalás: ${SERVICE.name} — ${confirmed.name} (${confirmed.phone})${confirmed.paid ? " — kifizetve online" : " — fizetés a szalonban"}`;
+  const isTransfer = (confirmed.amount || "").includes(TRANSFER_TAG);
+  const description = `Foglalás: ${SERVICE.name} — ${confirmed.name} (${confirmed.phone})${isTransfer ? " — utalással fizet" : " — fizetés a szalonban"}`;
   const location = "Hajszál Pontosan Fodrászat";
 
   function handleClientICS() {
@@ -415,7 +469,7 @@ function ConfirmationTicket({ confirmed, day, eventStartDate, onNewBooking }) {
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, marginTop: 8, letterSpacing: "0.02em" }}>{SERVICE.name.toUpperCase()}</div>
           <div style={{ color: COLORS.inkSoft, fontSize: 14, marginTop: 2 }}>{confirmed.name} · {confirmed.phone}</div>
           <div style={{ fontSize: 13, marginTop: 6, color: COLORS.ok, fontWeight: 700 }}>
-            {confirmed.paid ? `Kifizetve online — ${confirmed.amount}` : `Fizetés a szalonban — ${confirmed.amount}`}
+            {isTransfer ? `Fizetés utalással — ${SERVICE.priceLabel}` : `Fizetés a szalonban — ${confirmed.amount}`}
           </div>
         </div>
 
@@ -433,6 +487,15 @@ function ConfirmationTicket({ confirmed, day, eventStartDate, onNewBooking }) {
             <div style={{ fontSize: 11.5, color: COLORS.inkSoft }}>{confirmed.duration} perc</div>
           </div>
         </div>
+
+        {isTransfer && (
+          <div style={{ marginTop: 20 }}>
+            <BankBox
+              amountLabel={SERVICE.priceLabel}
+              reference={makeReference(confirmed.name, day, confirmed.startMinutes)}
+            />
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 24 }}>
           <button onClick={handleClientICS} style={{
