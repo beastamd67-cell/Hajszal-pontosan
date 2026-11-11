@@ -50,7 +50,7 @@ export default function BookingApp() {
   const selectedDayClosure = useMemo(() => findClosure(dateKey(selectedDay), closures), [selectedDay, closures]);
 
   const availableSlots = useMemo(() => slotsForDay({
-    dayBookings, isToday: dateKey(selectedDay) === dateKey(new Date()), closed: !!selectedDayClosure,
+    day: selectedDay, dayBookings, isToday: dateKey(selectedDay) === dateKey(new Date()), closed: !!selectedDayClosure,
   }), [dayBookings, selectedDay, selectedDayClosure]);
 
   function cardValid() {
@@ -190,7 +190,7 @@ function BookingFlow(props) {
         <div>
           <div style={{ fontFamily: "'Oswald', sans-serif", fontWeight: 700, fontSize: 19, textTransform: "uppercase", letterSpacing: "0.01em" }}>{SERVICE.name}</div>
           <div style={{ fontSize: 13, color: COLORS.inkSoft, fontFamily: "'Space Mono', monospace", marginTop: 3 }}>
-            {SERVICE.duration} perc · 9:00–19:00 között, óránként
+            {SERVICE.duration} perc · óránként, 18:00-ig
           </div>
         </div>
         <div style={{ fontFamily: "'Space Mono', monospace", fontWeight: 700, fontSize: 18 }}>{SERVICE.priceLabel}</div>
